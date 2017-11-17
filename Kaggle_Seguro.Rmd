@@ -31,7 +31,7 @@ packages <- c("data.table",
               "caret",
               "ggplot2",
               "ROCR",
-              "liquidSVM")
+              "e1071")
 
 sapply(packages, require, character.only = TRUE)
 ```
@@ -217,28 +217,41 @@ auc <- performance(pr, measure = "auc")
 
 # SVM Model
 
-For this feat, we will use **liquidSVM** package. 
+For this feat, we will use **e1071** package. 
 
 Fit SVM model
 ```{r warning = FALSE, message = FALSE, results = "hide"}
-svm_model <- svm(target ~ ., 
-                predict.prob = T,
-                max_gamma = 25)
+svm_model <- svm(target ~ ., data=train_data, kernel="linear", probability=TRUE)
 
-model <- svm(target ~ ., data=train_data, kernel="linear", probability=TRUE)
-pred_svm <- predict(model, train_data, probability=TRUE)
-head(attr(pred_svm, "probabilities"))
 ```
 
 
 
 we will check the predictions on the test
 
+Very broadly speaking with classifiers like this, the predicted value for a binary response variable can be thought of as the probability that that observation belongs to class 1 (in this case your classes are actually labeled 0/1; in other cases you'd need to know which class the function treats as 1 or 0; R often sorts the labels of factors alphabetically and so the last one would be class 1).
+
+
 ```{r}
-results <- test(svm_model, test_data)
-errors(results)
+pred_svm <- predict(model, train_data, probability=TRUE)
+probabilities <- attr(pred_svm, "probabilities")
+head(probabilities)
+pr <- prediction(probabilities[,1], train_data[,"target"])
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 ```
+
+And here is the ROC plot
+```{r}
+plot(prf, main = "ROC")
+abline(0,1, col = "red")
+```        
+
+We also calculate the AUC 
+```{r}
+auc <- performance(pr, measure = "auc")
+(auc <- auc@y.values[[1]]) 
 ```
+Not great 
 
 # Submission to Kaggle
 
