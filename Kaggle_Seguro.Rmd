@@ -31,7 +31,9 @@ packages <- c("data.table",
               "caret",
               "ggplot2",
               "ROCR",
-              "e1071")
+              "e1071",
+              "rpart.plot",
+              "rpart")
 
 sapply(packages, require, character.only = TRUE)
 ```
@@ -42,7 +44,7 @@ We use *data.table's* **fread()** function to speed up reading in the data, even
 
 ```{r warning = FALSE, message = FALSE, results = FALSE}
 seguro_train <- fread("train_test.csv") # <- Replace the file to train.csv
-
+seguro_train[seguro_train == -1] <- NA
 #seguro_test <- fread("test_test.csv") # <- Replace the file to test.csv
 ```
 
@@ -54,9 +56,8 @@ Since, there is no **target** variable in test dataset we'll have to split the t
 nobs <- nrow(seguro_train) 
 train_inx <- sample(nrow(seguro_train), 0.8 * nobs)
 
-
 train_data <- seguro_train[train_inx,]
-test_data <- seguro_train[!train_inx]
+test_data <- seguro_train[-train_inx,]
 ```
 
 # Overview: File structure and content {.tabset .tabset-fade .tabset-pills}
@@ -180,12 +181,12 @@ will also convert our **test** dataset into **as.h2o** format.
 ```{r warning = FALSE, message = FALSE, results = "hide"}
 test_data$target <- as.factor(test_data$target)
 t_test <- encode_fun(df = as.data.frame(test_data))
-test.h2o <- as.h2o(t_test)
+test.h2o <- as.h2o(t_test[,-1])
 ```
 
 We will now use **h2o.predict()** function to make predictions using **test** dataset
 ```{r warning = FALSE, message = FALSE, results = "hide"}
-pred <- h2o.predict(log_mod, train.h2o)
+pred <- h2o.predict(log_mod, test.h2o)
 pred <- as.data.frame(pred[, 'p1'])
 ```
 
@@ -196,8 +197,8 @@ pred <- as.data.frame(pred[, 'p1'])
 which are typical performance measurements for a binary classifier. 
 
 ```{r warning = FALSE, message = FALSE, results = "hide"}
-    pr <- prediction(pred, train_data[,"target"])
-    prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+pr <- prediction(pred, test_data[,"target"])
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 ```
 
 
@@ -221,19 +222,17 @@ For this feat, we will use **e1071** package.
 
 Fit SVM model
 ```{r warning = FALSE, message = FALSE, results = "hide"}
-svm_model <- svm(target ~ ., data=train_data, kernel="linear", probability=TRUE)
+svm_model <- svm(target ~ ., data = train_data, kernel="linear", probability=TRUE)
 
 ```
 
 
+Very broadly speaking with classifiers like this, the predicted value for a binary response variable can be thought of as the probability that that observation belongs to class 1 (in this case your classes are actually labeled 0/1; in other cases you'd need to know which class the function treats as 1 or 0; R often sorts the labels of factors alphabetically and so the last one would be class 1).
 
 we will check the predictions on the test
 
-Very broadly speaking with classifiers like this, the predicted value for a binary response variable can be thought of as the probability that that observation belongs to class 1 (in this case your classes are actually labeled 0/1; in other cases you'd need to know which class the function treats as 1 or 0; R often sorts the labels of factors alphabetically and so the last one would be class 1).
-
-
 ```{r}
-pred_svm <- predict(svm_model, train_data, probability=TRUE)
+pred_svm <- predict(svm_model, test_data, probability=TRUE )
 probabilities <- attr(pred_svm, "probabilities")
 head(probabilities)
 pr <- prediction(probabilities[,1], train_data[,"target"])
@@ -242,7 +241,7 @@ prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 
 And here is the ROC plot
 ```{r}
-plot(prf, main = "ROC")
+plot(prf, main = "ROC Curve")
 abline(0,1, col = "red")
 ```        
 
@@ -251,7 +250,42 @@ We also calculate the AUC
 auc <- performance(pr, measure = "auc")
 (auc <- auc@y.values[[1]]) 
 ```
-Not great 
+Not great AUC score we want it closer to the 1 then .5 unfortuntely ours is coloser to .5, so we'll have to do some feature engineering.
+
+
+#CART Modeling
+
+Make sure all the categorical variables are converted into factors. The function **rpart** will run a regression tree if the response variable is numeric, and a classification tree if it is a factor. 
+
+Step1: Begin with a small cp.
+```{r}
+tree_model <- rpart(target ~ ., data = train_data, control = rpart.control(cp = 0.0000001))   
+```
+Step2: Pick the tree size that minimizes misclassification rate (i.e. prediction error).
+Prediction error rate in training data = Root node error * rel error * 100%
+Prediction error rate in cross-validation = Root node error * xerror * 100%
+Hence we want the cp value (with a simpler tree) that minimizes the xerror. 
+```{r}
+printcp(tree_model)
+```
+
+```{r}
+bestcp <-  which.min(tree_model$cptable[,"xerror"])
+cp <- tree_model$cptable[bestcp, "CP"]
+```
+Step3: Prune the tree using the best cp.
+```{r}
+tree_pruned <- prune(tree_model, cp )
+```
+
+```{r}
+
+mean(test_data$target == predict(tree_model,  test_data, type="class"))
+table(pred=predict(tree_model,  test_data, type="class"),true=test_data$target)
+```
+```{r}
+prp(tree_model, faclen = 0, cex = 0.8, extra = 1)
+```
 
 # Submission to Kaggle
 
