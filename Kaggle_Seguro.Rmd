@@ -126,8 +126,8 @@ encode_fun <- function(df){
 
 
 ```{r}
-newtrain <- encode_fun(df = data.frame(train))
-train$target <- as.factor(train$target)
+newtrain <- encode_fun(df = data.frame(train_data))
+train_data$target <- as.factor(train_data$target)
 ```
 
 bind the two datasets, it will help us with the visulations.
@@ -180,14 +180,15 @@ summary(log_mod)
 
 will also convert our **test** dataset into **as.h2o** format.
 ```{r}
-t_test <- encode_fun(data.frame(test))
+test_data$target <- as.factor(test_data$target)
+t_test <- encode_fun(df = as.data.frame(test_data))
 test.h2o <- as.h2o(t_test)
 ```
 
 We will now use **h2o.predict()** function to make predictions using **test** dataset
 ```{r}
 pred <- h2o.predict(log_mod, train.h2o)
-pred <- pred[, 'p1']
+pred <- as.data.frame(pred[, 'p1'])
 ```
 
 
@@ -197,7 +198,7 @@ pred <- pred[, 'p1']
 which are typical performance measurements for a binary classifier. 
 
 ```{r}
-    pr <- prediction(pred, test.h2o[,"target"])
+    pr <- prediction(pred, train_data[,"target"])
     prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 ```
 
