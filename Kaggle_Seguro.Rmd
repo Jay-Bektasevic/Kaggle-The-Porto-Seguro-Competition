@@ -183,7 +183,7 @@ And here is the ROC plot
 ```        
 
 
-# Submission
+# Submission to Kaggle
 
 submission_data <- data.frame(id = test$id, target = as.vector(pred))
 
