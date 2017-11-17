@@ -233,7 +233,7 @@ Very broadly speaking with classifiers like this, the predicted value for a bina
 
 
 ```{r}
-pred_svm <- predict(model, train_data, probability=TRUE)
+pred_svm <- predict(svm_model, train_data, probability=TRUE)
 probabilities <- attr(pred_svm, "probabilities")
 head(probabilities)
 pr <- prediction(probabilities[,1], train_data[,"target"])
