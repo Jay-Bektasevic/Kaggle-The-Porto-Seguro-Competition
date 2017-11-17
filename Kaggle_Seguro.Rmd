@@ -132,10 +132,10 @@ train_data$target <- as.factor(train_data$target)
 
 bind the two datasets, it will help us with the visulations.
 ```{r}
-combine <- bind_rows(train %>% mutate(dset = "train"), 
-                     test %>% mutate(dset = "test",
-                                     target = NA))
-combine <- combine %>% mutate(dset = factor(dset))
+# combine <- bind_rows(train %>% mutate(dset = "train"), 
+#                      test %>% mutate(dset = "test",
+#                                      target = NA))
+# combine <- combine %>% mutate(dset = factor(dset))
 
 ```
 
@@ -158,7 +158,7 @@ We will use *h2o package* wich allows the user to run basic H2O commands using R
 Here we'll initilalize h2o cluster we will also convert our **train** dataset into **as.h2o** format.
 
 we will then build a *Logistic Regression Model* using **h2o.glm()** function and we'll store the results in **log_mod** object.
-```{r}
+```{r warning = FALSE, message = FALSE, results = "hide"}
 h2o.init()
 train.h2o <- as.h2o(newtrain,  destination_frame ="train")
 
@@ -179,25 +179,25 @@ summary(log_mod)
 # Model Prediction
 
 will also convert our **test** dataset into **as.h2o** format.
-```{r}
+```{r warning = FALSE, message = FALSE, results = "hide"}
 test_data$target <- as.factor(test_data$target)
 t_test <- encode_fun(df = as.data.frame(test_data))
 test.h2o <- as.h2o(t_test)
 ```
 
 We will now use **h2o.predict()** function to make predictions using **test** dataset
-```{r}
+```{r warning = FALSE, message = FALSE, results = "hide"}
 pred <- h2o.predict(log_mod, train.h2o)
 pred <- as.data.frame(pred[, 'p1'])
 ```
 
 
-## Model Performance
+## Model Performance 
 
 *ROCR package* will allow us to plot the ROC curve and calculate the AUC (area under the curve) 
 which are typical performance measurements for a binary classifier. 
 
-```{r}
+```{r warning = FALSE, message = FALSE, results = "hide"}
     pr <- prediction(pred, train_data[,"target"])
     prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 ```
