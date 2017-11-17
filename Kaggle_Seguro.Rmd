@@ -13,26 +13,25 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 
-This is an extensive Exploratory Data Analysis for the [Porto Seguro's Safe Driver Prediction](https://www.kaggle.com/c/porto-seguro-safe-driver-prediction) competition within the R environment of the [tidyverse](http://tidyverse.org/) and [ggplot2](http://ggplot2.tidyverse.org/). We will visualise all the different data features, their relation to the **target** variable, explore multi-parameter interactions, and perform feature engineering.
-
-The aim of this challenge is to predict the probability whether a driver will make an insurance claim, with the purpose of providing a fairer insurance cost on the basis of individual driving habits. It is sponsored by [Porto Seguro](https://www.portoseguro.com.br/) - a major car and home insurance company in Brazil
+This is an analysis for the [Porto Seguro's Safe Driver Prediction](https://www.kaggle.com/c/porto-seguro-safe-driver-prediction) competition.
+It is sponsored by [Porto Seguro](https://www.portoseguro.com.br/) - a major Brazilian insurance company  who would like to predict which policies are more likely to file a claim within a year. The evaluation metric is normalized Gini coefficient, which measures how well predictions segment the target.
 
 The [data](https://www.kaggle.com/c/porto-seguro-safe-driver-prediction/data) comes in the traditional Kaggle form of one training and test file each: `../input/train.csv` & `../input/test.csv`. Each row corresponds to a specific policy holder and the columns describe their features. The target variable is conveniently named **target** here and it indicates whether this policy holder made an insurance claim in the past. 
 
-
-# Preparations {.tabset .tabset-fade .tabset-pills}
+The training dataset consists of around 595,000 rows and 59 columns, including the dependent variable target. The features in the training set have been given nondescript names, such as ps_ind_01, so any attempt to relate customer information to predictor variables will be difficult.
 
 ## Load libraries
 
 We load a range of libraries for general data wrangling and general visualisation together with more specialised tools.
 
-```{r, message = FALSE, warning = FALSE}
+```{r, message = FALSE, warning = FALSE, results = "hide"}
 packages <- c("data.table",
               "tidyverse",
               "h2o",
               "caret",
               "ggplot2",
-              "ROCR" )
+              "ROCR",
+              "liquidSVM")
 
 sapply(packages, require, character.only = TRUE)
 ```
@@ -81,7 +80,6 @@ We find:
 
 - Note, that there is a **ps\_car\_11** as well as a **ps\_car\_11\_cat**. This is the only occasion where the numbering per group is neither consecutive nor unique. Probably a typo in the script that created the variable names.
 
-- The features are anonymised, because that worked so well in [Mercedes](https://www.kaggle.com/c/mercedes-benz-greener-manufacturing). Just kidding. Mostly ;-)
 
 
 ## Test data:
@@ -205,14 +203,42 @@ which are typical performance measurements for a binary classifier.
 
 And here is the ROC plot
 ```{r}
-    plot(prf, main = "ROC")
-    abline(0,1, col = "red")
-    
-    auc <- performance(pr, measure = "auc")
-    auc <- auc@y.values[[1]] 
-    auc
+plot(prf, main = "ROC")
+abline(0,1, col = "red")
 ```        
 
+We also calculate the AUC 
+```{r}
+auc <- performance(pr, measure = "auc")
+(auc <- auc@y.values[[1]]) 
+```
+
+
+
+# SVM Model
+
+For this feat, we will use **liquidSVM** package. 
+
+Fit SVM model
+```{r warning = FALSE, message = FALSE, results = "hide"}
+svm_model <- svm(target ~ ., 
+                predict.prob = T,
+                max_gamma = 25)
+
+model <- svm(target ~ ., data=train_data, kernel="linear", probability=TRUE)
+pred_svm <- predict(model, train_data, probability=TRUE)
+head(attr(pred_svm, "probabilities"))
+```
+
+
+
+we will check the predictions on the test
+
+```{r}
+results <- test(svm_model, test_data)
+errors(results)
+```
+```
 
 # Submission to Kaggle
 
