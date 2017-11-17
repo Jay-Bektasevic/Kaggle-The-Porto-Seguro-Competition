@@ -27,13 +27,14 @@ The [data](https://www.kaggle.com/c/porto-seguro-safe-driver-prediction/data) co
 We load a range of libraries for general data wrangling and general visualisation together with more specialised tools.
 
 ```{r, message = FALSE, warning = FALSE}
-library(data.table)
-library(tidyverse)
-library(h2o)
-library(caret)
-library(ggplot2)
-library(ROCR)
+packages <- c("data.table",
+              "tidyverse",
+              "h2o",
+              "caret",
+              "ggplot2",
+              "ROCR" )
 
+sapply(packages, require, character.only = TRUE)
 ```
 
 ## Load data
@@ -41,11 +42,23 @@ library(ROCR)
 We use *data.table's* **fread()** function to speed up reading in the data, even though in this challenge our files are not very large with about 110 MB for **train** and 165 MB for **test**. Here we are taking into account the fact that missing values in the original data sets are indicated by `-1` or `-1.0` and turn those into "proper" NAs.
 
 ```{r warning = FALSE, message = FALSE, results = FALSE}
-train <- fread("train_test.csv") # <- Replace the file to train.csv
+seguro_train <- fread("train_test.csv") # <- Replace the file to train.csv
 
-test <- fread("test_test.csv") # <- Replace the file to test.csv
+#seguro_test <- fread("test_test.csv") # <- Replace the file to test.csv
 ```
 
+## Split train dataset
+
+Since, there is no **target** variable in test dataset we'll have to split the training test for validation purposes.
+
+```{r}
+nobs <- nrow(seguro_train) 
+train_inx <- sample(nrow(seguro_train), 0.8 * nobs)
+
+
+train_data <- seguro_train[train_inx,]
+test_data <- seguro_train[!train_inx]
+```
 
 # Overview: File structure and content {.tabset .tabset-fade .tabset-pills}
 
@@ -54,8 +67,8 @@ As a first step let's have an overview of the data sets using the **summary()** 
 ## Training data
 
 ```{r warning = FALSE, message = FALSE}
-class(train)
-glimpse(train)
+class(train_data)
+glimpse(train_data)
 ```
 
 We find:
@@ -74,12 +87,12 @@ We find:
 ## Test data:
 
 ```{r}
-summary(test)
+summary(test_data)
 ```
 
 
 ```{r}
-glimpse(test)
+glimpse(test_data)
 ```
 
 We find: 
@@ -90,9 +103,9 @@ We find:
 This will display count of missing values from each variable.
 
 ```{r}
-sapply(train, function(x) sum(is.na(x)))
+sapply(train_data, function(x) sum(is.na(x)))
 
-sapply(test, function(x) sum(is.na(x)))
+sapply(test_data, function(x) sum(is.na(x)))
 ```
 
 ## Reformating features
@@ -116,6 +129,16 @@ encode_fun <- function(df){
 newtrain <- encode_fun(df = data.frame(train))
 train$target <- as.factor(train$target)
 ```
+
+bind the two datasets, it will help us with the visulations.
+```{r}
+combine <- bind_rows(train %>% mutate(dset = "train"), 
+                     test %>% mutate(dset = "test",
+                                     target = NA))
+combine <- combine %>% mutate(dset = factor(dset))
+
+```
+
 
 # Visualisations 
 
@@ -146,6 +169,13 @@ log_mod <- h2o.glm(x = colnames(train.h2o)[-1], y = "target",
                lambda_search = TRUE)
 ```
 
+Model details
+
+```{r}
+summary(log_mod)
+```
+
+
 # Model Prediction
 
 will also convert our **test** dataset into **as.h2o** format.
@@ -156,8 +186,8 @@ test.h2o <- as.h2o(t_test)
 
 We will now use **h2o.predict()** function to make predictions using **test** dataset
 ```{r}
-pred <- h2o.predict(log_mod, test.h2o)
-pred <- prediction[, 'p1']
+pred <- h2o.predict(log_mod, train.h2o)
+pred <- pred[, 'p1']
 ```
 
 
@@ -167,7 +197,7 @@ pred <- prediction[, 'p1']
 which are typical performance measurements for a binary classifier. 
 
 ```{r}
-    pr <- prediction(pred, test.h2o$target)
+    pr <- prediction(pred, test.h2o[,"target"])
     prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 ```
 
