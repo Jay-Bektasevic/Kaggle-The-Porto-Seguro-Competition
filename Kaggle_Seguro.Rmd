@@ -51,7 +51,7 @@ for the ease of computetion, let's combine the two datasets.
 
 ```{r}
 test_data$target <- NA
-merged_data <- rbind(train_data[1:10000,], test_data[1:10000,]) #get the sample of each dataset
+merged_data <- rbind(train_data, test_data) #get the sample of each dataset
 rm(train_data,test_data)
 
 # Feature engineering
@@ -80,14 +80,12 @@ merged_data[, (cat_vars) := lapply(.SD, factor), .SDcols = cat_vars]
 Since, there is no **target** variable in test dataset we'll have to split the training test for validation purposes.
 
 ```{r}
-nobs <- nrow(merged_data_train) 
-merged_data_train <- merged_data[1:10000,]
-train_inx <- sample(nrow(merged_data_train), 0.8 * nobs)
+#nobs <- nrow(merged_data) 
+#merged_data_train <- merged_data[1:10000,]
+#train_inx <- sample(nrow(merged_data[!is.na(merged_data)]), 0.8 * nobs)
 
-train_data <- merged_data_train[train_inx,]
-test_data <- merged_data_train[-train_inx,]
-
-
+train_data <- merged_data[!is.na(merged_data$target)]
+test_data <- merged_data[is.na(merged_data$target)]
 ```
 
 # Overview: File structure and content {.tabset .tabset-fade .tabset-pills}
@@ -155,18 +153,9 @@ encode_fun <- function(df){
 
 
 ```{r}
-newtrain <- encode_fun(df = data.frame(train_data[,-1]))
+newtrain <- encode_fun(df = data.frame(train_data[,-2]))
 newtrain$target <- as.factor(train_data$target)
 newtrain <- newtrain[,c(ncol(newtrain), 1:(ncol(newtrain)-1))]
-```
-
-bind the two datasets, it will help us with the visulations.
-```{r}
-# combine <- bind_rows(train %>% mutate(dset = "train"), 
-#                      test %>% mutate(dset = "test",
-#                                      target = NA))
-# combine <- combine %>% mutate(dset = factor(dset))
-
 ```
 
 
@@ -195,11 +184,13 @@ h2o.init(nthreads = -1)
 
 train.h2o <- as.h2o(newtrain,  destination_frame ="train")
 
-log_mod <- h2o.glm(x = colnames(train.h2o)[-1], y = "target", 
-               training_frame=train.h2o,
-               family = "binomial", 
-               standardize = TRUE,
-               lambda_search = TRUE)
+log_mod <- h2o.glm(x = colnames(train.h2o)[-1], 
+                   y = "target", 
+                   training_frame = train.h2o,
+                   family = "binomial",
+                   interactions = colnames(train.h2o)[-1],
+                   standardize = TRUE,
+                   lambda_search = TRUE)
 ```
 
 Model details
@@ -214,7 +205,7 @@ summary(log_mod)
 will also convert our **test** dataset into **as.h2o** format.
 ```{r warning = FALSE, message = FALSE, results = "hide"}
 t_test <- encode_fun(df = as.data.frame(test_data))
-test.h2o <- as.h2o(t_test)
+test.h2o <- as.h2o(t_test[,-1])
 #test.h2o <- as.h2o(test_data[,-c(1,2)])
 ```
 
@@ -248,7 +239,7 @@ auc <- performance(pr, measure = "auc")
 (auc <- auc@y.values[[1]]) 
 ```
 
-When submitted this model was given score of 0.259.
+When submitted this model was given score of 0.6.
 
 
 #Naive Bayes
@@ -270,6 +261,9 @@ We will now use **h2o.predict()** function to make predictions using **test** da
 pred <- h2o.predict(bayes_mod, test.h2o, type= "prob")
 pred <- as.data.frame(pred[, 'p1'])
 ```
+
+gini score of 0.189
+
 ## Model Performance 
 
 *ROCR package* will allow us to plot the ROC curve and calculate the AUC (area under the curve) 
@@ -292,6 +286,31 @@ We also calculate the AUC
 auc <- performance(pr, measure = "auc")
 (auc <- auc@y.values[[1]]) 
 ```
+
+
+#Random Forest
+
+since we already have the data loaded in h2o enviroment we can easily run naiveBayes there
+
+```{r}
+forest_mod <- h2o.randomForest(x = colnames(train.h2o)[-1], y = "target", 
+               training_frame=train.h2o, ntrees = 100,
+                          max_depth = 30,
+                          nbins_cats = 1115)
+```
+
+```{r}
+summary(forest_mod)
+```
+
+We will now use **h2o.predict()** func
+```{r warning = FALSE, message = FALSE, results = "hide"}
+pred <- h2o.predict(forest_mod , test.h2o, type= "prob")
+pred <- as.data.frame(pred[, 'p1'])
+```
+
+gini score 0.189
+
 
 #SVM Model
 
@@ -337,6 +356,6 @@ Not great AUC score we want it closer to the 1 then .5 unfortuntely ours is colo
 submission_data <- data.frame(id = test_data$id, target = as.vector(pred))
 colnames(submission_data)[2] <- "target"
 
-fwrite(submission_data, "glm_model.csv", row.names = FALSE)
+fwrite(submission_data, "forest_model.csv", row.names = FALSE)
 ```
 			 
