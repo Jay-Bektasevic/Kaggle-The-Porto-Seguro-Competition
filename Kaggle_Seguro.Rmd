@@ -296,6 +296,7 @@ prp(tree_model, faclen = 0, cex = 0.8, extra = 1)
 # Submission to Kaggle
 ```{r}
 submission_data <- data.frame(id = test_data$id, target = as.vector(pred))
+colnames(submission_data)[2] <- "target"
 
 fwrite(submission_data, "glm_model.csv", row.names = FALSE)
 ```
