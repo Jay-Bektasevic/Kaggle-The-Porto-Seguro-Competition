@@ -43,22 +43,51 @@ sapply(packages, require, character.only = TRUE)
 We use *data.table's* **fread()** function to speed up reading in the data, even though in this challenge our files are not very large with about 110 MB for **train** and 165 MB for **test**. Here we are taking into account the fact that missing values in the original data sets are indicated by `-1` or `-1.0` and turn those into "proper" NAs.
 
 ```{r warning = FALSE, message = FALSE, results = FALSE}
-train_data <- fread("train.csv") # <- Replace the file to train.csv
+train_data <- fread("train.csv") 
 test_data <- fread("test.csv")
-seguro_train[seguro_train == -1] <- NA
-#seguro_test <- fread("test_test.csv") # <- Replace the file to test.csv
 ```
+
+for the ease of computetion, let's combine the two datasets.
+
+```{r}
+test_data$target <- NA
+merged_data <- rbind(train_data[1:10000,], test_data[1:10000,]) #get the sample of each dataset
+rm(train_data,test_data)
+
+# Feature engineering
+merged_data[, amount_nas := rowSums(merged_data == -1, na.rm = T)]
+merged_data[, high_nas := ifelse(amount_nas >4,1,0)]
+merged_data[, ps_car_13_ps_reg_03 := ps_car_13 * ps_reg_03]
+merged_data[, ps_reg_mult := ps_reg_01 * ps_reg_02 * ps_reg_03]
+merged_data[, ps_ind_bin_sum := ps_ind_06_bin +  ps_ind_07_bin + ps_ind_08_bin + ps_ind_09_bin + ps_ind_10_bin + ps_ind_11_bin +
+                                ps_ind_12_bin + ps_ind_13_bin + ps_ind_16_bin + ps_ind_17_bin + ps_ind_18_bin]	
+```
+
+
+```{r}
+
+# collect names of all categorical/binary variables
+cat_vars <- names(merged_data)[grepl('_cat$', names(merged_data))]
+
+# turn categorical features into factors
+merged_data[, (cat_vars) := lapply(.SD, factor), .SDcols = cat_vars]
+
+```
+
 
 ## Split train dataset
 
 Since, there is no **target** variable in test dataset we'll have to split the training test for validation purposes.
 
 ```{r}
-nobs <- nrow(seguro_train) 
-train_inx <- sample(nrow(seguro_train), 0.8 * nobs)
+nobs <- nrow(merged_data_train) 
+merged_data_train <- merged_data[1:10000,]
+train_inx <- sample(nrow(merged_data_train), 0.8 * nobs)
 
-train_data <- seguro_train[train_inx,]
-test_data <- seguro_train[-train_inx,]
+train_data <- merged_data_train[train_inx,]
+test_data <- merged_data_train[-train_inx,]
+
+
 ```
 
 # Overview: File structure and content {.tabset .tabset-fade .tabset-pills}
@@ -126,7 +155,7 @@ encode_fun <- function(df){
 
 
 ```{r}
-newtrain <- encode_fun(df = data.frame(train_data[,-2]))
+newtrain <- encode_fun(df = data.frame(train_data[,-1]))
 newtrain$target <- as.factor(train_data$target)
 newtrain <- newtrain[,c(ncol(newtrain), 1:(ncol(newtrain)-1))]
 ```
@@ -184,7 +213,6 @@ summary(log_mod)
 
 will also convert our **test** dataset into **as.h2o** format.
 ```{r warning = FALSE, message = FALSE, results = "hide"}
-test_data <- test_data[,-1]
 t_test <- encode_fun(df = as.data.frame(test_data))
 test.h2o <- as.h2o(t_test)
 #test.h2o <- as.h2o(test_data[,-c(1,2)])
@@ -203,7 +231,7 @@ pred <- as.data.frame(pred[, 'p1'])
 which are typical performance measurements for a binary classifier. 
 
 ```{r warning = FALSE, message = FALSE, results = "hide"}
-pr <- prediction(pred, newtrain[,"target"])
+pr <- prediction(pred, test_data[,"target"])
 prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 ```
 
@@ -220,9 +248,52 @@ auc <- performance(pr, measure = "auc")
 (auc <- auc@y.values[[1]]) 
 ```
 
+When submitted this model was given score of 0.259.
 
 
-# SVM Model
+#Naive Bayes
+
+since we already have the data loaded in h2o enviroment we can easily run naiveBayes there
+
+```{r}
+bayes_mod <- h2o.naiveBayes(x = colnames(train.h2o)[-1], y = "target", 
+               training_frame=train.h2o,
+               laplace = 3)
+```
+
+```{r}
+summary(bayes_mod)
+```
+
+We will now use **h2o.predict()** function to make predictions using **test** dataset
+```{r warning = FALSE, message = FALSE, results = "hide"}
+pred <- h2o.predict(bayes_mod, test.h2o, type= "prob")
+pred <- as.data.frame(pred[, 'p1'])
+```
+## Model Performance 
+
+*ROCR package* will allow us to plot the ROC curve and calculate the AUC (area under the curve) 
+which are typical performance measurements for a binary classifier. 
+
+```{r warning = FALSE, message = FALSE, results = "hide"}
+pr <- prediction(pred, test_data[,"target"])
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+```
+
+
+And here is the ROC plot
+```{r}
+plot(prf, main = "ROC")
+abline(0,1, col = "red")
+```        
+
+We also calculate the AUC 
+```{r}
+auc <- performance(pr, measure = "auc")
+(auc <- auc@y.values[[1]]) 
+```
+
+#SVM Model
 
 For this feat, we will use **e1071** package. 
 
@@ -241,7 +312,7 @@ we will check the predictions on the test
 pred_svm <- predict(svm_model, test_data, probability=TRUE )
 probabilities <- attr(pred_svm, "probabilities")
 head(probabilities)
-pr <- prediction(probabilities[,1], train_data[,"target"])
+pr <- prediction(pred_svm, test_data[,"target"])
 prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 ```
 
@@ -259,39 +330,7 @@ auc <- performance(pr, measure = "auc")
 Not great AUC score we want it closer to the 1 then .5 unfortuntely ours is coloser to .5, so we'll have to do some feature engineering.
 
 
-#CART Modeling
 
-Make sure all the categorical variables are converted into factors. The function **rpart** will run a regression tree if the response variable is numeric, and a classification tree if it is a factor. 
-
-Step1: Begin with a small cp.
-```{r}
-tree_model <- rpart(target ~ ., data = train_data, control = rpart.control(cp = 0.0000001))   
-```
-Step2: Pick the tree size that minimizes misclassification rate (i.e. prediction error).
-Prediction error rate in training data = Root node error * rel error * 100%
-Prediction error rate in cross-validation = Root node error * xerror * 100%
-Hence we want the cp value (with a simpler tree) that minimizes the xerror. 
-```{r}
-printcp(tree_model)
-```
-
-```{r}
-bestcp <-  which.min(tree_model$cptable[,"xerror"])
-cp <- tree_model$cptable[bestcp, "CP"]
-```
-Step3: Prune the tree using the best cp.
-```{r}
-tree_pruned <- prune(tree_model, cp )
-```
-
-```{r}
-
-mean(test_data$target == predict(tree_model,  test_data, type="class"))
-table(pred=predict(tree_model,  test_data, type="class"),true=test_data$target)
-```
-```{r}
-prp(tree_model, faclen = 0, cex = 0.8, extra = 1)
-```
 
 # Submission to Kaggle
 ```{r}
@@ -300,3 +339,4 @@ colnames(submission_data)[2] <- "target"
 
 fwrite(submission_data, "glm_model.csv", row.names = FALSE)
 ```
+			 
