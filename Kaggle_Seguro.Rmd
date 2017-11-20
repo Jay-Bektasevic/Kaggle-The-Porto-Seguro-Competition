@@ -43,7 +43,8 @@ sapply(packages, require, character.only = TRUE)
 We use *data.table's* **fread()** function to speed up reading in the data, even though in this challenge our files are not very large with about 110 MB for **train** and 165 MB for **test**. Here we are taking into account the fact that missing values in the original data sets are indicated by `-1` or `-1.0` and turn those into "proper" NAs.
 
 ```{r warning = FALSE, message = FALSE, results = FALSE}
-seguro_train <- fread("train_test.csv") # <- Replace the file to train.csv
+train_data <- fread("train.csv") # <- Replace the file to train.csv
+test_data <- fread("test.csv")
 seguro_train[seguro_train == -1] <- NA
 #seguro_test <- fread("test_test.csv") # <- Replace the file to test.csv
 ```
@@ -125,8 +126,9 @@ encode_fun <- function(df){
 
 
 ```{r}
-newtrain <- encode_fun(df = data.frame(train_data))
-train_data$target <- as.factor(train_data$target)
+newtrain <- encode_fun(df = data.frame(train_data[,-2]))
+newtrain$target <- as.factor(train_data$target)
+newtrain <- newtrain[,c(ncol(newtrain), 1:(ncol(newtrain)-1))]
 ```
 
 bind the two datasets, it will help us with the visulations.
@@ -158,7 +160,10 @@ Here we'll initilalize h2o cluster we will also convert our **train** dataset in
 
 we will then build a *Logistic Regression Model* using **h2o.glm()** function and we'll store the results in **log_mod** object.
 ```{r warning = FALSE, message = FALSE, results = "hide"}
-h2o.init()
+
+h2o.shutdown() # shutdown existing instance
+h2o.init(nthreads = -1)
+
 train.h2o <- as.h2o(newtrain,  destination_frame ="train")
 
 log_mod <- h2o.glm(x = colnames(train.h2o)[-1], y = "target", 
@@ -179,9 +184,10 @@ summary(log_mod)
 
 will also convert our **test** dataset into **as.h2o** format.
 ```{r warning = FALSE, message = FALSE, results = "hide"}
-test_data$target <- as.factor(test_data$target)
+test_data <- test_data[,-1]
 t_test <- encode_fun(df = as.data.frame(test_data))
-test.h2o <- as.h2o(t_test[,-1])
+test.h2o <- as.h2o(t_test)
+#test.h2o <- as.h2o(test_data[,-c(1,2)])
 ```
 
 We will now use **h2o.predict()** function to make predictions using **test** dataset
@@ -197,7 +203,7 @@ pred <- as.data.frame(pred[, 'p1'])
 which are typical performance measurements for a binary classifier. 
 
 ```{r warning = FALSE, message = FALSE, results = "hide"}
-pr <- prediction(pred, test_data[,"target"])
+pr <- prediction(pred, newtrain[,"target"])
 prf <- performance(pr, measure = "tpr", x.measure = "fpr")
 ```
 
@@ -288,8 +294,8 @@ prp(tree_model, faclen = 0, cex = 0.8, extra = 1)
 ```
 
 # Submission to Kaggle
-
-submission_data <- data.frame(id = test$id, target = as.vector(pred))
+```{r}
+submission_data <- data.frame(id = test_data$id, target = as.vector(pred))
 
 fwrite(submission_data, "glm_model.csv", row.names = FALSE)
-
+```
