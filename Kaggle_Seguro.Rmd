@@ -51,12 +51,12 @@ for the ease of computetion, let's combine the two datasets.
 
 ```{r}
 test_data$target <- NA
-merged_data <- rbind(train_data, test_data) #get the sample of each dataset
+merged_data <- rbind(train_data, test_data) 
 rm(train_data,test_data)
 
 # Feature engineering
 merged_data[, amount_nas := rowSums(merged_data == -1, na.rm = T)]
-merged_data[, high_nas := ifelse(amount_nas >4,1,0)]
+merged_data[, high_nas := ifelse(amount_nas > 4, 1, 0)]
 merged_data[, ps_car_13_ps_reg_03 := ps_car_13 * ps_reg_03]
 merged_data[, ps_reg_mult := ps_reg_01 * ps_reg_02 * ps_reg_03]
 merged_data[, ps_ind_bin_sum := ps_ind_06_bin +  ps_ind_07_bin + ps_ind_08_bin + ps_ind_09_bin + ps_ind_10_bin + ps_ind_11_bin +
@@ -73,7 +73,18 @@ cat_vars <- names(merged_data)[grepl('_cat$', names(merged_data))]
 merged_data[, (cat_vars) := lapply(.SD, factor), .SDcols = cat_vars]
 
 ```
+Often when running logistic regression on larger data sets where we've done a lot of factor encoding we may run into issues with linear dependence among the features. If we try to fit a logistic regression where this is the case, we will get a rank-deficient fit. To alleviate this, we can use the findLinearCombos function from the caret package to locate the offending features. Here I run the function and then remove the features as suggested in the remove element of the resulting list.
 
+```{r}
+# find any linear combos in features
+lin_comb <- findLinearCombos(merged_data[,3:ncol(merged_data)])
+
+# take set difference of feature names and linear combos
+diff <- setdiff(seq(1:ncol(merged_data)), lin_comb$remove)
+
+# remove linear combo columns
+merged_data1 <- merged_data[ ,62]
+```
 
 
 ## Split train dataset
@@ -187,7 +198,8 @@ log_mod <- h2o.glm(x = colnames(train.h2o)[-c(1, 50)],
                    y = "target", 
                    training_frame = train.h2o,
                    family = "binomial",
-                   #interactions = c("ps_car_13", "ps_reg_01", "ps_reg_02", "ps_reg_03")
+                   interactions = c( 'ps_calc_06', 'ps_calc_13',  'ps_calc_04', 'ps_calc_14', 'ps_ind_15', 'ps_calc_07', 
+                                     'ps_calc_11',  'ps_calc_09', 'ps_ind_03' ),
                    weights_column = "weight",
                    standardize = TRUE,
                    lambda_search = TRUE)
@@ -216,6 +228,7 @@ pred <- h2o.predict(log_mod, test.h2o)
 pred <- as.data.frame(pred[, 'p1'])
 ```
 
+After adding weights and couple of interaction variables the submission score remains at .260
 
 ## Model Performance 
 
@@ -320,11 +333,11 @@ an Extremely-Randomized Forest, a random grid of Gradient Boosting Machines (GBM
 random grid of Deep Neural Nets, and then trains a Stacked Ensemble using all of the models.
 
 ```{r}
-aml_model <- h2o.automl(x = colnames(train.h2o)[-1], y = "target", 
+aml_model <- h2o.automl(x = colnames(train.h2o)[-c(1, 50)], y = "target", 
                training_frame = train.h2o,
                   leaderboard_frame = test.h2o,
-                 # weights_column = 'weight',
-                  max_runtime_secs = 3000)
+                    weights_column = 'weight',
+                  max_runtime_secs = 0)
 ```
 
 
