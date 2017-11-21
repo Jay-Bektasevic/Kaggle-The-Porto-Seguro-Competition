@@ -186,6 +186,8 @@ We will use *h2o package* wich allows the user to run basic H2O commands using R
 Here we'll initilalize h2o cluster we will also convert our **train** dataset into **as.h2o** format.
 
 we will then build a *Logistic Regression Model* using **h2o.glm()** function and we'll store the results in **log_mod** object.
+
+We've introduced interaction variables into the model.
 ```{r warning = FALSE, message = FALSE, results = "hide"}
 
 h2o.shutdown() # shutdown existing instance
@@ -194,7 +196,7 @@ h2o.init(nthreads = -1)
 train.h2o <- as.h2o(newtrain,  destination_frame ="train")
 
 
-log_mod <- h2o.glm(x = colnames(train.h2o)[-c(1, 50)], 
+log_mod <- h2o.glm(x = colnames(train.h2o2)[-c(1, 50)], 
                    y = "target", 
                    training_frame = train.h2o,
                    family = "binomial",
@@ -228,7 +230,7 @@ pred <- h2o.predict(log_mod, test.h2o)
 pred <- as.data.frame(pred[, 'p1'])
 ```
 
-After adding weights and couple of interaction variables the submission score remains at .260
+After adding weights and some of interaction variables the submission score remains at .260
 
 ## Model Performance 
 
@@ -384,7 +386,7 @@ At this point I will focus on the other models that showed good results with lot
 
 # Submission to Kaggle
 ```{r}
-submission_data <- data.frame(id = test_data$id, target = as.vector(pred))
+submission_data <- data.frame(id = merged_data[is.na(merged_data$target),]$id, target = as.vector(pred))
 colnames(submission_data)[2] <- "target"
 
 fwrite(submission_data, "glm_model_weight.csv", row.names = FALSE)
