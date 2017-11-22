@@ -59,8 +59,9 @@ merged_data[, amount_nas := rowSums(merged_data == -1, na.rm = T)]
 merged_data[, high_nas := ifelse(amount_nas > 4, 1, 0)]
 merged_data[, ps_car_13_ps_reg_03 := ps_car_13 * ps_reg_03]
 merged_data[, ps_reg_mult := ps_reg_01 * ps_reg_02 * ps_reg_03]
-merged_data[, ps_ind_bin_sum := ps_ind_06_bin +  ps_ind_07_bin + ps_ind_08_bin + ps_ind_09_bin + ps_ind_10_bin + ps_ind_11_bin +
-                                ps_ind_12_bin + ps_ind_13_bin + ps_ind_16_bin + ps_ind_17_bin + ps_ind_18_bin]	
+merged_data[, ps_ind_bin_sum := ps_ind_06_bin +  ps_ind_07_bin + ps_ind_08_bin + ps_ind_09_bin + ps_ind_10_bin +
+                                ps_ind_11_bin + ps_ind_12_bin + ps_ind_13_bin + ps_ind_16_bin + 
+                                ps_ind_17_bin + ps_ind_18_bin]	
 ```
 
 
@@ -403,12 +404,26 @@ pred <- as.data.frame(pred[, 'p1'])
 ```
 
 
+# GBM
+```{r}
+gbm_mod <- h2o.gbm(x = colnames(train.h2o)[-c(1, 50)], 
+                 y = "target", 
+                 training_frame = train.h2o)
+summary(gbm_mod)
+```
+We will now use **h2o.predict()** func
+```{r warning = FALSE, message = FALSE, results = "hide"}
+pred <- h2o.predict(gbm_mod , test.h2o, type= "prob")
+pred <- as.data.frame(pred[, 'p1'])
+```
+
+gbm_model so far is the best first submission .272
 
 # Submission to Kaggle
 ```{r}
 submission_data <- data.frame(id = merged_data[is.na(merged_data$target),]$id, target = as.vector(pred))
 colnames(submission_data)[2] <- "target"
 
-fwrite(submission_data, "logistic_model.csv", row.names = FALSE)
+fwrite(submission_data, "gbm_model.csv", row.names = FALSE)
 ```
 			 
