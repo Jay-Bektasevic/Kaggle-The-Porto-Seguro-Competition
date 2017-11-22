@@ -192,9 +192,11 @@ We've introduced interaction variables into the model.
 ```{r warning = FALSE, message = FALSE, results = "hide"}
 
 h2o.shutdown() # shutdown existing instance
-h2o.init(nthreads = -1)
+h2o.init()
 
 train.h2o <- as.h2o(newtrain,  destination_frame ="train")
+test.h2o <- as.h2o(t_test[,-1])
+test.h2o <- h2o.cbind(test.h2o, as.h2o(data.frame(weight = rep.int(1, 892816)))) # only if weights are applied
 
 
 log_mod <- h2o.glm(x = colnames(train.h2o)[-c(1, 50)], 
@@ -413,6 +415,7 @@ gbm_mod <- h2o.gbm(x = colnames(train.h2o)[-c(1, 50)],
                  nfolds = 10,
                  #balance_classes = TRUE,
                  distribution = "bernoulli",
+                 nbins_cats = 2000,
                  seed = 123)
 summary(gbm_mod)
 ```
@@ -422,17 +425,24 @@ pred <- h2o.predict(gbm_mod , test.h2o, type= "prob")
 pred <- as.data.frame(pred[, 'p1'])
 ```
 
-gbm_model so far is the best first submission **0.272**
+Our **gbm_model** so far is the best first submission **0.272**
 
 Since, the classes are severly skewed we will use h2o.gbm() function parameter **balance_classes = TRUE** to balance the classes.
 By, balancing classes it appears that our AUC score incheds up but our gini index actually falls down to **0.269**. 
 by adding weights and 10-fold cross-validation on training data it bumps our score to **0.273**. Note that at this point, GBM model does not allow for concurent parameters of **weights_column** and **balance_classes**. We need to find a different way of ballancing classes through upsampling/downsampling.
+By taking out **weights** and enabling balance class our model does not improve it actually drops the gini score to **0.270**.
+
+We can aslo look at the scoring history
+```{r}
+plot(gbm_mod)
+```
+
 
 # Submission to Kaggle
 ```{r}
 submission_data <- data.frame(id = test_data$id, target = as.vector(pred))
 colnames(submission_data)[2] <- "target"
 
-fwrite(submission_data, "gbm_model_weighted.csv", row.names = FALSE)
+fwrite(submission_data, "gbm_model_bal2.csv", row.names = FALSE)
 ```
 			 
