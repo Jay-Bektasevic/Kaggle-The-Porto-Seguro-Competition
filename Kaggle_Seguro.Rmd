@@ -54,7 +54,7 @@ test_data$target <- NA
 merged_data <- rbind(train_data, test_data) 
 rm(train_data,test_data)
 
-# Feature engineering
+# Feature engineering based on https://www.kaggle.com/lscoelho/rgf-with-20-nonlinear-features
 merged_data[, amount_nas := rowSums(merged_data == -1, na.rm = T)]
 merged_data[, high_nas := ifelse(amount_nas > 4, 1, 0)]
 merged_data[, ps_car_13_ps_reg_03 := ps_car_13 * ps_reg_03]
@@ -62,6 +62,14 @@ merged_data[, ps_reg_mult := ps_reg_01 * ps_reg_02 * ps_reg_03]
 merged_data[, ps_ind_bin_sum := ps_ind_06_bin +  ps_ind_07_bin + ps_ind_08_bin + ps_ind_09_bin + ps_ind_10_bin +
                                 ps_ind_11_bin + ps_ind_12_bin + ps_ind_13_bin + ps_ind_16_bin + 
                                 ps_ind_17_bin + ps_ind_18_bin]	
+
+merged_data[, f001 := ps_ind_03^3.45 + ps_ind_14^2.19 + ps_ind_15^2.23]
+merged_data[, f002 := ps_ind_03^2.45 + ps_ind_14^3.76 + ps_ind_15^2.42]
+merged_data[, f003 := tanh(ps_ind_03) + ps_ind_14^2.36 + tanh(ps_ind_15)]
+merged_data[, f004 := ps_ind_03^2.03 + tanh(ps_ind_14) + ps_ind_15^2.12]
+merged_data[, f005 := ps_ind_03^2.27 + ps_ind_14^3.02 + tanh(ps_ind_15) * ps_reg_mult]
+merged_data[, f006 := ps_reg_mult^2.01 + ps_calc_14^2.13]
+merged_data[, f007 := ps_calc_01^2.31 + ps_calc_13^2.27 + ps_calc_14^2.43]
 ```
 
 
@@ -193,7 +201,7 @@ We've introduced interaction variables into the model.
 
 h2o.shutdown() # shutdown existing instance
 h2o.init()
-
+# load the train and test datasets into h2o enviroment
 train.h2o <- as.h2o(newtrain,  destination_frame ="train")
 test.h2o <- as.h2o(t_test[,-1])
 test.h2o <- h2o.cbind(test.h2o, as.h2o(data.frame(weight = rep.int(1, 892816)))) # only if weights are applied
@@ -408,7 +416,7 @@ pred <- as.data.frame(pred[, 'p1'])
 
 # GBM
 ```{r}
-gbm_mod <- h2o.gbm(x = colnames(train.h2o)[-c(1, 50)], 
+gbm_mod <- h2o.gbm(x = colnames(train.h2o)[-c(1, 57)], 
                  y = "target", 
                  training_frame = train.h2o,
                  weights_column = "weight",
@@ -441,6 +449,38 @@ We can check the variable importance and select only ones that have scaled impor
 gbm_mod@model$variable_importances
 var_imp <- gbm_mod@model$variable_importances[gbm_mod@model$variable_importances$scaled_importance >= 0.01,]
 ```
+
+we will now use all the important varibles in the model and rerun the model using only the variables that we've selected
+```{r}
+
+train.h2o <- train.h2o[c("target", "weight", var_imp[,1])]
+test.h2o <- test.h2o[c("weight", var_imp[,1])]
+```
+
+# Re-run the GBM model
+```{r}
+gbm_mod <- h2o.gbm(x = colnames(train.h2o)[-c(1, 2)], 
+                 y = "target", 
+                 training_frame = train.h2o,
+                 weights_column = "weight",
+                 nfolds = 10,
+                 #balance_classes = TRUE,
+                 distribution = "bernoulli",
+                 nbins_cats = 2000,
+                 seed = 123)
+summary(gbm_mod)
+```
+We will now use **h2o.predict()** func
+```{r warning = FALSE, message = FALSE, results = "hide"}
+pred <- h2o.predict(gbm_mod , test.h2o, type= "prob")
+pred <- as.data.frame(pred[, 'p1'])
+```
+
+
+
+
+
+
 
 # Submission to Kaggle
 ```{r}
