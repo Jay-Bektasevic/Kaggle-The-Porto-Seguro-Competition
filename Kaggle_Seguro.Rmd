@@ -436,7 +436,11 @@ We can aslo look at the scoring history
 ```{r}
 plot(gbm_mod)
 ```
-
+We can check the variable importance and select only ones that have scaled importance of >= 0.01
+```{r}
+gbm_mod@model$variable_importances
+var_imp <- gbm_mod@model$variable_importances[gbm_mod@model$variable_importances$scaled_importance >= 0.01,]
+```
 
 # Submission to Kaggle
 ```{r}
