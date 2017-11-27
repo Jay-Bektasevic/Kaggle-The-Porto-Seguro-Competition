@@ -184,7 +184,7 @@ We start our exploration with overview distribution plots for the various featur
 These plots will be one of the pillars of our analysis. They might not be particularly exciting in themselves, but whenever we find an interesting effect in one of the variables we can come back here and examine their distribution. It's always an advantage to start with a clear view of the parameter space.
 
 
-**-> I'll deal with this later on <-**
+**-> See Visualisations.R for plots and charts<-**
 
 # Modeling
 
@@ -485,6 +485,6 @@ We see a slight improvement in **AUC** and **Gini** but not enough to beat the h
 submission_data <- data.frame(id = test_data$id, target = as.vector(pred))
 colnames(submission_data)[2] <- "target"
 
-fwrite(submission_data, "gbm_model_bal2.csv", row.names = FALSE)
+fwrite(submission_data, "gbm_model_final.csv", row.names = FALSE)
 ```
 			
