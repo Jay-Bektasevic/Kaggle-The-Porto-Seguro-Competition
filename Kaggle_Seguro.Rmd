@@ -1,7 +1,7 @@
 ---
 title: "Kaggle Competition - Porto Seguro"
 author: "Jay Bektasevic"
-date: "`r Sys.Date()`"
+date: "11/26/2017"
 output: html_document
         
 ---
@@ -13,16 +13,16 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 
-This is an analysis for the [Porto Seguro's Safe Driver Prediction](https://www.kaggle.com/c/porto-seguro-safe-driver-prediction) competition.
-It is sponsored by [Porto Seguro](https://www.portoseguro.com.br/) - a major Brazilian insurance company  who would like to predict which policies are more likely to file a claim within a year. The evaluation metric is normalized Gini coefficient, which measures how well predictions segment the target.
+This is an analysis of the [Porto Seguro's Safe Driver Prediction](https://www.kaggle.com/c/porto-seguro-safe-driver-prediction) competition.
+It is sponsored by [Porto Seguro](https://www.portoseguro.com.br/) - a major Brazilian insurance company who would like to predict which policies are more likely to file a claim within a year. The evaluation metric is normalized Gini coefficient, which measures how well predictions segment the target.
 
-The [data](https://www.kaggle.com/c/porto-seguro-safe-driver-prediction/data) comes in the traditional Kaggle form of one training and test file each: `../input/train.csv` & `../input/test.csv`. Each row corresponds to a specific policy holder and the columns describe their features. The target variable is conveniently named **target** here and it indicates whether this policy holder made an insurance claim in the past. 
+The [data](https://www.kaggle.com/c/porto-seguro-safe-driver-prediction/data) comes in the traditional Kaggle form of one training and test file each: `../input/train.csv` & `../input/test.csv`. Each row corresponds to a specific policyholder and the columns describe their features. The target variable is conveniently named **target** here and it indicates whether this policyholder made an insurance claim in the past. 
 
 The training dataset consists of around 595,000 rows and 59 columns, including the dependent variable target. The features in the training set have been given nondescript names, such as ps_ind_01, so any attempt to relate customer information to predictor variables will be difficult.
 
 ## Load libraries
 
-We load a range of libraries for general data wrangling and visualisation together with more specialised tools.
+We load a range of libraries for general data wrangling and visualization together with more specialized tools.
 
 ```{r, message = FALSE, warning = FALSE, results = "hide"}
 packages <- c("data.table",
@@ -47,7 +47,7 @@ train_data <- fread("train.csv")
 test_data <- fread("test.csv")
 ```
 
-for the ease of computetion, let's combine the two datasets.
+for the ease of computation, let's combine the two datasets.
 
 ```{r}
 test_data$target <- NA
@@ -82,7 +82,7 @@ cat_vars <- names(merged_data)[grepl('_cat$', names(merged_data))]
 merged_data[, (cat_vars) := lapply(.SD, factor), .SDcols = cat_vars]
 
 ```
-Often when running logistic regression on larger data sets where we've done a lot of factor encoding we may run into issues with linear dependence among the features. If we try to fit a logistic regression where this is the case, we will get a rank-deficient fit. To alleviate this, we can use the findLinearCombos function from the caret package to locate the offending features. Here I run the function and then remove the features as suggested in the remove element of the resulting list.
+Often when running a logistic regression on larger data sets where we've done a lot of factor encoding we may run into issues with linear dependence among the features. If we try to fit a logistic regression where this is the case, we will get a rank-deficient fit. To alleviate this, we can use the findLinearCombos function from the caret package to locate the offending features. Here I run the function and then remove the features as suggested in the removed element of the resulting list.
 
 ```{r}
 # find any linear combos in features
@@ -98,7 +98,7 @@ merged_data1 <- merged_data[ ,62]
 
 ## Split train dataset
 
-Since, there is no **target** variable in test dataset we'll have to split the training test for validation purposes.
+Since there is no **target** variable in test dataset we'll have to split the training test for validation purposes.
 
 ```{r}
 #nobs <- nrow(merged_data) 
@@ -129,11 +129,11 @@ glimpse(train_data)
 
 We find:
 
-- There are lots of features here. In total, our **training** data has 59 variables, including **id** and **target**. In some of them we already see a number of NAs.
+- There are lots of features here. In total, our **training** data has 59 variables, including **id** and **target**. In some of them, we already see a number of NAs.
 
 - The [data description](https://www.kaggle.com/c/porto-seguro-safe-driver-prediction/data) mentions that the names of the features indicate whether they are binary (**bin**) or categorical (**cat**) variables. Everything else is continuous or ordinal.
 
-- We have already [been told](https://www.kaggle.com/c/porto-seguro-safe-driver-prediction/discussion/40222) by [Adriano Moala](https://www.kaggle.com/adrianomoala) that the names of the variables indicate certain properties: *Ind" is related to individual or driver, "reg" is related to region, "car" is related to car itself and "calc" is an calculated feature.' Here we will refer to these properties as groups.
+- We have already [been told](https://www.kaggle.com/c/porto-seguro-safe-driver-prediction/discussion/40222) by [Adriano Moala](https://www.kaggle.com/adrianomoala) that the names of the variables indicate certain properties: *Ind" is related to individual or driver, "reg" is related to region, "car" is related to car itself and "calc" is a calculated feature.' Here we will refer to these properties as groups.
 
 - Note, that there is a **ps\_car\_11** as well as a **ps\_car\_11\_cat**. This is the only occasion where the numbering per group is neither consecutive nor unique. Probably a typo in the script that created the variable names.
 
@@ -155,7 +155,7 @@ We find:
 
 ## Reformating features
 
-We will turn the categorical features into factors and and will use dummyVars() function form caret package to one hot encode. We created our own function **encode_fun()** to help us with the transformation. Also, the **target** variable will be reformated as a factor.
+We will turn the categorical features into factors and will use dummyVars() function form caret package to one hot encoding. We created our own function **encode_fun()** to help us with the transformation. Also, the **target** variable will be reformated as a factor.
 
 ```{r}
 encode_fun <- function(df){
@@ -179,7 +179,7 @@ newtrain <- newtrain[,c(ncol(newtrain), 1:(ncol(newtrain)-1))]
 
 # Visualisations 
 
-We start our exploration with overview distribution plots for the various features. In order to make this visualisation more comprehensive, we will create layouts for the specific groups of features. For the sake of readability we divide each group into multiple parts.
+We start our exploration with overview distribution plots for the various features. In order to make this visualization more comprehensive, we will create layouts for the specific groups of features. For the sake of readability, we divide each group into multiple parts.
 
 These plots will be one of the pillars of our analysis. They might not be particularly exciting in themselves, but whenever we find an interesting effect in one of the variables we can come back here and examine their distribution. It's always an advantage to start with a clear view of the parameter space.
 
@@ -190,7 +190,7 @@ These plots will be one of the pillars of our analysis. They might not be partic
 
 ## Training
 
-We will use *h2o package* wich allows the user to run basic H2O commands using R commands. This will greatly help with the sheer size of the datasets because no actual data is stored in **R** workspace, and no actual work is carried out by R. R rather merely saves the named objects on the server. 
+We will use *h2o package* which allows the user to run basic H2O commands using R commands. This will greatly help with the sheer size of the datasets because no actual data is stored in **R** workspace, and no actual work is carried out by R. R rather merely saves the named objects on the server. 
 
 Here we'll initilalize h2o cluster we will also convert our **train** dataset into **as.h2o** format.
 
@@ -267,12 +267,12 @@ auc <- performance(pr, measure = "auc")
 (auc <- auc@y.values[[1]]) 
 ```
 
-When submitted this model was given score of 0.6.
+When submitted this model was given a score of 0.6.
 
 
 #Naive Bayes
 
-since we already have the data loaded in h2o enviroment we can easily run naiveBayes there
+since we already have the data loaded in the h2o environment we can easily run naiveBayes there
 
 ```{r}
 bayes_mod <- h2o.naiveBayes(x = colnames(train.h2o)[-1], y = "target", 
@@ -318,7 +318,7 @@ auc <- performance(pr, measure = "auc")
 
 #Random Forest
 
-since we already have the data loaded in h2o enviroment we can easily run naiveBayes there
+since we already have the data loaded in the h2o environment we can easily run Random Forest there
 
 ```{r}
 forest_mod <- h2o.randomForest(x = colnames(train.h2o)[-1], y = "target", 
@@ -392,8 +392,8 @@ We also calculate the AUC
 auc <- performance(pr, measure = "auc")
 (auc <- auc@y.values[[1]]) 
 ```
-Although SVM model showed potential on smaller dataset, when I attmepted to train it on the entire datase it ran for 13 hours before I terminated it.
-At this point I will focus on the other models that showed good results with lot less computationl complexity. 
+Although SVM model showed potential on the smaller dataset, when I attempted to train it on the entire dataset it ran for 13 hours before I terminated it.
+At this point, I will focus on the other models that showed good results with lot less computational complexity. 
 # Deep Learning (Neural Networks)
 
 ```{r}
@@ -436,9 +436,9 @@ pred <- as.data.frame(pred[, 'p1'])
 Our **gbm_model** so far is the best first submission **0.272**
 
 Since, the classes are severly skewed we will use h2o.gbm() function parameter **balance_classes = TRUE** to balance the classes.
-By, balancing classes it appears that our AUC score incheds up but our gini index actually falls down to **0.269**. 
-by adding weights and 10-fold cross-validation on training data it bumps our score to **0.273**. Note that at this point, GBM model does not allow for concurent parameters of **weights_column** and **balance_classes**. We need to find a different way of ballancing classes through upsampling/downsampling.
-By taking out **weights** and enabling balance class our model does not improve it actually drops the gini score to **0.270**.
+By, balancing classes it appears that our **AUC** score inches up but our **Gini** index actually falls down to **0.269**. 
+by adding weights and 10-fold cross-validation on training data it bumps our score to **0.273**. Note that at this point, GBM model does not allow for concurrent parameters of **weights_column** and **balance_classes**. We need to find a different way of balancing classes through upsampling/downsampling.
+By taking out **weights** and enabling balance class our model does not improve it actually drops the **Gini** score to **0.270**.
 
 We can aslo look at the scoring history
 ```{r}
@@ -450,7 +450,7 @@ gbm_mod@model$variable_importances
 var_imp <- gbm_mod@model$variable_importances[gbm_mod@model$variable_importances$scaled_importance >= 0.01,]
 ```
 
-we will now use all the important varibles in the model and rerun the model using only the variables that we've selected
+we will now use all the important variables in the model and rerun the model using only the variables that we've selected
 ```{r}
 
 train.h2o <- train.h2o[c("target", "weight", var_imp[,1])]
@@ -476,9 +476,7 @@ pred <- h2o.predict(gbm_mod , test.h2o, type= "prob")
 pred <- as.data.frame(pred[, 'p1'])
 ```
 
-
-
-
+We see a slight improvement in **AUC** and **Gini** but not enough to beat the highest score of **0.273**. It is interesting to see that after taking out insignificant variables that the model actually performs better. Furthermore, the time to train the model improves significantly. At this point, I will use this as my final model for this competition. I do not feel that I can do better without more insight into the dataset, or come up with a better feature engineering.
 
 
 
@@ -489,4 +487,4 @@ colnames(submission_data)[2] <- "target"
 
 fwrite(submission_data, "gbm_model_bal2.csv", row.names = FALSE)
 ```
-			 
+			
