@@ -110,7 +110,7 @@ test_data <- merged_data[is.na(merged_data$target)]
 ```
 
 
-# Create a weight column for autoML. Upweight positive class by factor of 2
+Create a weight column for autoML. Upweight positive class by factor of 2
 ```{r}
 
 train_data[, weight := ifelse(target == 1, 2, 1)]
