@@ -18,7 +18,7 @@ It is sponsored by [Porto Seguro](https://www.portoseguro.com.br/) - a major Bra
 
 The [data](https://www.kaggle.com/c/porto-seguro-safe-driver-prediction/data) comes in the traditional Kaggle form of one training and test file each: `../input/train.csv` & `../input/test.csv`. Each row corresponds to a specific policyholder and the columns describe their features. The target variable is conveniently named **target** here and it indicates whether this policyholder made an insurance claim in the past. 
 
-The training dataset consists of around 595,000 rows and 59 columns, including the dependent variable target. The features in the training set have been given nondescript names, such as ps_ind_01, so any attempt to relate customer information to predictor variables will be difficult.
+The training dataset consists of around 595,000 rows and 59 columns, including the dependent variable target. The features in the training set have been given nondescript names, such as **ps_ind_01**, so any attempt to relate customer information to predictor variables will be difficult.
 
 ## Load libraries
 
@@ -82,7 +82,7 @@ cat_vars <- names(merged_data)[grepl('_cat$', names(merged_data))]
 merged_data[, (cat_vars) := lapply(.SD, factor), .SDcols = cat_vars]
 
 ```
-Often when running a logistic regression on larger data sets where we've done a lot of factor encoding we may run into issues with linear dependence among the features. If we try to fit a logistic regression where this is the case, we will get a rank-deficient fit. To alleviate this, we can use the findLinearCombos function from the caret package to locate the offending features. Here I run the function and then remove the features as suggested in the removed element of the resulting list.
+Often when running a logistic regression on larger data sets where we've done a lot of factor encoding we may run into issues with linear dependence among the features. If we try to fit a logistic regression where this is the case, we will get a rank-deficient fit. To alleviate this, we can use the **findLinearCombos()** function from the *caret* package to locate the offending features. Here I run the function and then remove the features as suggested in the removed element of the resulting list.
 
 ```{r}
 # find any linear combos in features
@@ -476,7 +476,7 @@ pred <- h2o.predict(gbm_mod , test.h2o, type= "prob")
 pred <- as.data.frame(pred[, 'p1'])
 ```
 
-We see a slight improvement in **AUC** and **Gini** but not enough to beat the highest score of **0.273**. It is interesting to see that after taking out insignificant variables that the model actually performs better. Furthermore, the time to train the model improves significantly. At this point, I will use this as my final model for this competition. I do not feel that I can do better without more insight into the dataset, or come up with a better feature engineering.
+We see a slight improvement in **AUC** and **Gini** but not enough to beat the highest score of **0.273**. It is interesting to see that after taking out insignificant variables that the model actually performs better. Furthermore, the time to train the model improves significantly. At this point, I will use this as my final model for this competition. I do not feel that I can do better without more insight into the dataset, or come up with a better feature engineering scheme.
 
 
 
